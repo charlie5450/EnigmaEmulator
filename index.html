@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Enigma Machine Emulator</title>
+<style>
+  body {
+    background: #111;
+    color: #ffcc00;
+    font-family: 'Courier New', monospace;
+    margin: 0; padding: 20px;
+    user-select: none;
+  }
+  h1 {
+    text-align: center;
+    margin-bottom: 30px;
+    font-weight: 900;
+    text-shadow: 0 0 10px #ffcc00;
+  }
+  .rotors {
+    display: flex;
+    justify-content: center;
+    gap: 60px;
+    margin-bottom: 40px;
+  }
+  .rotor {
+    position: relative;
+    width: 160px;
+    height: 160px;
+    background: radial-gradient(circle at center, #222 70%, #000 100%);
+    border-radius: 50%;
+    box-shadow:
+      inset 0 0 12px #555,
+      0 0 22px #ffcc00;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  .rotor .letters {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0; left: 0;
+    pointer-events: none;
+  }
+  .rotor .letters div {
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    line-height: 24px;
+    text-align: center;
+    border-radius: 50%;
+    background: #222;
+    color: #ffcc00;
+    font-weight: bold;
+    text-shadow: 0 0 5px #000;
+    user-select: none;
+    box-shadow: inset 0 0 4px #000;
+    transition: background-color 0.3s, color 0.3s;
+    font-size: 14px;
+  }
+  .rotor .letters div.active {
+    background: #ffcc00;
+    color: #111;
+    box-shadow:
+      0 0 15px #ffcc00,
+      inset 0 0 8px #fff;
+    font-weight: 900;
+    font-size: 16px;
+  }
+  /* 원형 글자 위치 */
+  /* 26글자 원형으로 균일 배치 - trigonometry 계산 위치 */
+  .rotor .letters div {
+    top: 50%;
+    left: 50%;
+    transform-origin: 0 50%;
+  }
+  /* JS에서 동적 위치 지정으로 대체할 것 */
+
+  .pos-indicator {
+    position: absolute;
+    top: -40px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 40px;
+    font-weight: 900;
+    color: #ffcc00;
+    text-shadow: 0 0 12px #ffcc00;
+    user-select: none;
+  }
+  .ring-setting {
+    position: absolute;
+    bottom: -40px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 24px;
+    font-weight: 700;
+    color: #ffcc00;
+    background: #222;
+    padding: 4px 8px;
+    border-radius: 6px;
+    user-select: text;
+    outline: none;
+    text-align: center;
+    width: 32px;
+    box-shadow: inset 0 0 6px #000;
+  }
+  .ring-setting[contenteditable]:focus {
+    background: #ffcc00;
+    color: #111;
+    box-shadow: 0 0 8px #ffcc00;
+  }
+  .handle {
+    position: absolute;
+    top: 50%;
+    right: -55px;
+    transform: translateY(-50%);
+    width: 40px;
+    height: 90px;
+    background: linear-gradient(135deg, #333, #111);
+    border-radius: 12px;
+    cursor: pointer;
+    color: #ffcc00;
+    font-size: 28px;
+    line-height: 90px;
+    text-align: center;
+    user-select: none;
+    box-shadow:
+      inset 0 0 10px #000,
+      0 0 10px #ffcc00;
+    transition: background-color 0.3s;
+  }
+  .handle:active {
+    background: #ffcc00;
+    color: #111;
+    box-shadow: 0 0 20px #ffcc00;
+  }
+  .reflector-container {
+    text-align: center;
+    margin-bottom: 40px;
+  }
+  select {
+    font-size: 20px;
+    background: #222;
+    border: 2px solid #555;
+    color: #ffcc00;
+    padding: 8px 16px;
+    border-radius: 8px;
+    user-select: none;
+    outline: none;
+    box-shadow: 0 0 12px #ffcc00 inset;
+  }
+  select:focus {
+    border-color: #ffcc00;
+    box-shadow: 0 0 20px #ffcc00 inset;
+  }
+  .plugboard {
+    width: 700px;
+    height: 140px;
+    margin: 0 auto 10px;
+    position: relative;
+    background: #222;
+    border: 4px solid #555;
+    border-radius: 10px;
+    padding: 15px 30px;
+    box-sizing: border-box;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px 18px;
+  }
+.connector {
+  width: 44px;
+  height: 20px;
+  border-radius: 6px;
+  background: #222;
+  border: 2px solid #555;
+  box-shadow: inset 0 0 8px #000;
+  color: #666;        /* 기본 회색 - 미연결 */
+  font-weight: bold;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+  transition: background-color 0.3s, border-color 0.3s, color 0.3s;
+}
+.connector.connected {
+  background: #ffcc00;
+  border-color: #ffcc00;
+  color: #111;
+  box-shadow: 0 0 15px #ffcc00;
+}
+.connector.selected {
+  background: #ffaa00;
+  border-color: #ffaa00;
+  color: #111;
+  box-shadow: 0 0 20px #ffaa00;
+}
+
+  .plugboard-connections {
+    width: 700px;
+    margin: 10px auto 50px;
+    color: #ffcc00;
+    font-family: monospace;
+    font-size: 18px;
+    line-height: 1.6;
+    min-height: 30px;
+    user-select: none;
+    text-align: center;
+  }
+  .keyboard {
+    width: 520px;
+    margin: 0 auto 50px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+.keyboard-row {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.key {
+  width: 48px;
+  height: 48px;
+  line-height: 48px;
+  text-align: center;
+  border-radius: 6px;
+  border: 2px solid #555;
+  background: #333;
+  color: #ffcc00;
+  font-weight: bold;
+  font-size: 18px;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.3s, color 0.3s;
+}
+.key:active {
+  background: #ffcc00;
+  color: #111;
+}
+
+  .lamps {
+    width: 700px;
+    margin: 0 auto;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: center;
+  }
+  .lamp {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: #333;
+    box-shadow: inset 0 0 10px #000;
+    color: #555;
+    font-weight: bold;
+    text-align: center;
+    line-height: 38px;
+    user-select: none;
+    transition: background-color 0.3s, box-shadow 0.3s;
+  }
+  .lamp.on {
+    background: #ffcc00;
+    color: #222;
+    box-shadow: 0 0 18px #ffcc00, inset 0 0 15px #fff;
+  }
+</style>
+</head>
+<body>
+
+<h1>Enigma Machine Emulator</h1>
+<br/>
+<div class="rotors" aria-label="로터 3개">
+  <div class="rotor" id="rotor1" role="region" aria-label="로터 1">
+    <div class="pos-indicator" id="pos1">A</div>
+    <div class="ring-setting" id="ring1" contenteditable="true" spellcheck="false" aria-label="로터 1 링 설정">A</div>
+    <div class="letters"></div>
+    <div tabindex="0" class="handle" aria-label="로터 1 회전 손잡이" role="button" title="클릭 또는 엔터키로 회전">▶</div>
+  </div>
+  <div class="rotor" id="rotor2" role="region" aria-label="로터 2">
+    <div class="pos-indicator" id="pos2">A</div>
+    <div class="ring-setting" id="ring2" contenteditable="true" spellcheck="false" aria-label="로터 2 링 설정">A</div>
+    <div class="letters"></div>
+    <div tabindex="0" class="handle" aria-label="로터 2 회전 손잡이" role="button" title="클릭 또는 엔터키로 회전">▶</div>
+  </div>
+  <div class="rotor" id="rotor3" role="region" aria-label="로터 3">
+    <div class="pos-indicator" id="pos3">A</div>
+    <div class="ring-setting" id="ring3" contenteditable="true" spellcheck="false" aria-label="로터 3 링 설정">A</div>
+    <div class="letters"></div>
+    <div tabindex="0" class="handle" aria-label="로터 3 회전 손잡이" role="button" title="클릭 또는 엔터키로 회전">▶</div>
+  </div>
+</div>
+
+<div class="reflector-container">
+  <label for="reflector">Select Reflector: </label>
+  <select id="reflector" aria-label="Select Reflector">
+    <option value="B">Reflector B</option>
+    <option value="C">Reflector C</option>
+  </select>
+</div>
+
+<div class="plugboard" aria-label="플러그보드 연결기">
+  <!-- 연결기 A~Z 여기에 생성 -->
+</div>
+
+<div class="plugboard-connections" aria-live="polite" aria-atomic="true" aria-relevant="additions removals">
+  <!-- 플러그보드 연결 쌍 표시 -->
+</div>
+
+<div class="keyboard" aria-label="에니그마 키보드">
+  <!-- 키보드 버튼 생성 -->
+</div>
+
+<div class="lamps" aria-label="램프판">
+  <!-- 램프 표시 -->
+</div>
+<br/>
+<div class="output-area" aria-label="입력 누적 결과" style="width:700px; margin: 0 auto 20px; color:#ffcc00; font-family: monospace; font-size: 18px; min-height: 40px; background:#222; border: 2px solid #555; border-radius:8px; padding:10px; box-sizing:border-box;">
+  <strong>Input:</strong> <span id="inputOutput"></span>
+</div>
+<div class="output-area" aria-label="출력 누적 결과" style="width:700px; margin: 0 auto 50px; color:#ffcc00; font-family: monospace; font-size: 20px; min-height: 43px; background:#222; border: 2px solid #555; border-radius:8px; padding:10px; box-sizing:border-box; position:relative;">
+  <strong>Output:</strong> <span id="accumulatedOutput"></span>
+  <button id="clearOutput" style="position:absolute; top:10px; right:10px; background:#444; border:none; color:#ffcc00; font-weight:bold; cursor:pointer; border-radius:4px; padding:2px 8px; user-select:none;">Reset</button>
+</div>
+
+<script>
+(() => {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const qwertyRows = [
+  ['Q','W','E','R','T','Y','U','I','O','P'],
+  ['A','S','D','F','G','H','J','K','L'],
+  ['Z','X','C','V','B','N','M']
+];
+
+  // 로터 기본 정보
+  const ROTORS = {
+    I: { wiring: "EKMFLGDQVZNTOWYHXUSPAIBRCJ", notch: "Q" },
+    II: { wiring: "AJDKSIRUXBLHWTMCQGZNPYFVOE", notch: "E" },
+    III: { wiring: "BDFHJLCPRTXVZNYEIWGAKMUSQO", notch: "V" },
+    IV: { wiring: "ESOVPZJAYQUIRHXLNFTGKDCMWB", notch: "J" },
+    V: { wiring: "VZBRGITYUPSDNHLXAWMJQOFECK", notch: "Z" }
+  };
+
+  const REFLECTORS = {
+    B: "YRUHQSLDPXNGOKMIEBFZCWVJAT",
+    C: "FVPJIAOYEDRZXWGCTKUQSBNMHL"
+  };
+
+  // 현재 로터 순서, 오른쪽부터 왼쪽(실제 회전 순서)
+  let rotorOrder = ['III', 'II', 'I']; // 오른쪽 rotorOrder[0], 중간 rotorOrder[1], 왼쪽 rotorOrder[2]
+  let rotorPositions = [0,0,0];  // 위치(0~25) 오른쪽부터
+  let ringSettings = [0,0,0];    // 링 설정
+
+  const rotorsDom = [
+    document.getElementById('rotor1'),
+    document.getElementById('rotor2'),
+    document.getElementById('rotor3')
+  ];
+  const posIndicators = [
+    document.getElementById('pos1'),
+    document.getElementById('pos2'),
+    document.getElementById('pos3')
+  ];
+  const ringSettingsDom = [
+    document.getElementById('ring1'),
+    document.getElementById('ring2'),
+    document.getElementById('ring3')
+  ];
+  const reflectorDom = document.getElementById('reflector');
+  const plugboardDom = document.querySelector('.plugboard');
+  const plugboardConnectionsDom = document.querySelector('.plugboard-connections');
+  const keyboardDom = document.querySelector('.keyboard');
+  const lampsDom = document.querySelector('.lamps');
+
+  // 원형 글자 위치 계산 (26개)
+  function positionRotorLetters(container, activePos) {
+    const lettersDiv = container.querySelector('.letters');
+    lettersDiv.innerHTML = '';
+    for(let i=0; i<26; i++) {
+      const letterDiv = document.createElement('div');
+      letterDiv.textContent = alphabet[i];
+      letterDiv.dataset.index = i;
+
+      // 원형 배치 좌표 계산
+      const angle = (360 / 26) * i - 90; // 시작점 상단 맞춤
+      const radius = 65; // 반지름 (픽셀)
+      const rad = angle * Math.PI / 180;
+      const x = 80 + radius * Math.cos(rad) - 12; // 글자 폭 24의 절반 보정
+      const y = 80 + radius * Math.sin(rad) - 12;
+      letterDiv.style.position = 'absolute';
+      letterDiv.style.left = x + 'px';
+      letterDiv.style.top = y + 'px';
+
+      if(i === activePos) letterDiv.classList.add('active');
+
+      lettersDiv.appendChild(letterDiv);
+    }
+  }
+
+  // 로터 UI 업데이트
+  function updateRotorUI(idx) {
+    posIndicators[idx].textContent = alphabet[rotorPositions[idx]];
+    ringSettingsDom[idx].textContent = alphabet[ringSettings[idx]];
+    positionRotorLetters(rotorsDom[idx], rotorPositions[idx]);
+  }
+
+  // 링 설정 입력 이벤트 (contenteditable)
+  ringSettingsDom.forEach((elem, i) => {
+    elem.addEventListener('input', e => {
+      const val = elem.textContent.toUpperCase();
+      if(alphabet.includes(val)) {
+        ringSettings[i] = alphabet.indexOf(val);
+        elem.textContent = val;
+      } else {
+        elem.textContent = alphabet[ringSettings[i]];
+      }
+    });
+    elem.addEventListener('keydown', e => {
+      if(e.key === 'Enter') elem.blur();
+    });
+  });
+
+  // 로터 회전 (손잡이 클릭 or 키보드 엔터)
+  rotorsDom.forEach((rotorDom, idx) => {
+    const handle = rotorDom.querySelector('.handle');
+    handle.addEventListener('click', () => {
+      rotateRotor(idx);
+    });
+    handle.addEventListener('keydown', e => {
+      if(e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        rotateRotor(idx);
+      }
+    });
+  });
+
+  function rotateRotor(idx) {
+    rotorPositions[idx] = (rotorPositions[idx] + 1) % 26;
+    updateRotorUI(idx);
+  }
+
+  // 플러그보드 연결 생성
+  function createPlugboard() {
+    plugboardDom.innerHTML = '';
+    plugboardMap.clear();
+    for(let i=0; i<26; i++) {
+      const c = alphabet[i];
+      const conn = document.createElement('div');
+      conn.className = 'connector';
+      conn.textContent = c;
+      conn.dataset.letter = c;
+      plugboardDom.appendChild(conn);
+    }
+    updatePlugboardUIAndText();
+  }
+
+  let selectedConnector = null;
+  const plugboardMap = new Map();
+
+  // 클릭으로 플러그보드 연결 / 해제
+plugboardDom.addEventListener('click', e => {
+  if(!e.target.classList.contains('connector')) return;
+  const letter = e.target.dataset.letter;
+  if(selectedConnector === null) {
+    selectedConnector = letter;
+    e.target.classList.add('selected');
+  } else if(selectedConnector === letter) {
+    selectedConnector = null;
+    e.target.classList.remove('selected');
+  } else {
+    if(plugboardMap.get(selectedConnector) === letter) {
+      plugboardMap.delete(selectedConnector);
+      plugboardMap.delete(letter);
+    } else {
+      if(plugboardMap.has(selectedConnector)) {
+        const old = plugboardMap.get(selectedConnector);
+        plugboardMap.delete(old);
+        plugboardMap.delete(selectedConnector);
+      }
+      if(plugboardMap.has(letter)) {
+        const old = plugboardMap.get(letter);
+        plugboardMap.delete(old);
+        plugboardMap.delete(letter);
+      }
+      plugboardMap.set(selectedConnector, letter);
+      plugboardMap.set(letter, selectedConnector);
+    }
+    plugboardDom.querySelectorAll('.connector.selected').forEach(el => el.classList.remove('selected'));
+    selectedConnector = null;
+  }
+  updatePlugboardUIAndText();
+});
+
+function updatePlugboardUIAndText() {
+  // UI 상태 업데이트
+  plugboardDom.querySelectorAll('.connector').forEach(conn => {
+    const ch = conn.dataset.letter;
+    if(plugboardMap.has(ch)) {
+      conn.classList.add('connected');
+    } else {
+      conn.classList.remove('connected');
+    }
+  });
+
+  // 연결 쌍만 표시
+  const used = new Set();
+  let pairs = [];
+  for(let i=0; i<26; i++) {
+    const ch = alphabet[i];
+    if(used.has(ch)) continue;
+    if(plugboardMap.has(ch)) {
+      const peer = plugboardMap.get(ch);
+      if(!used.has(peer)) {
+        pairs.push(ch + " <> " + peer);
+        used.add(ch);
+        used.add(peer);
+      }
+    }
+  }
+  plugboardConnectionsDom.textContent = pairs.length > 0 ? pairs.join('    ') : '(No plugboard attached)';
+}
+
+  // 플러그보드 교환
+  function plugboardSwap(ch) {
+    return plugboardMap.get(ch) || ch;
+  }
+
+  // 키보드 생성 (QWERTY)
+function createKeyboard() {
+  keyboardDom.innerHTML = '';
+  qwertyRows.forEach(row => {
+    const rowDiv = document.createElement('div');
+    rowDiv.className = 'keyboard-row';
+    row.forEach(ch => {
+      const btn = document.createElement('button');
+      btn.className = 'key';
+      btn.textContent = ch;
+      btn.setAttribute('aria-label', ch + ' 키');
+      btn.addEventListener('click', () => {
+        encryptLetter(ch);        
+      });
+      rowDiv.appendChild(btn);
+    });
+    keyboardDom.appendChild(rowDiv);
+  });
+}
+
+
+  // 램프 생성
+  function createLamps() {
+    lampsDom.innerHTML = '';
+    alphabet.split('').forEach(ch => {
+      const lamp = document.createElement('div');
+      lamp.className = 'lamp';
+      lamp.id = 'lamp-' + ch;
+      lamp.textContent = ch;
+      lampsDom.appendChild(lamp);
+    });
+  }
+
+  // 램프 깜빡임
+  function flashLamp(ch) {
+    lampsDom.querySelectorAll('.lamp').forEach(l => l.classList.remove('on'));
+    const lamp = document.getElementById('lamp-' + ch);
+    if(lamp) lamp.classList.add('on');
+  }
+
+  // 로터 단계 회전 (오른쪽부터 시계방향)
+function stepRotors() {
+  // 오른쪽 로터 먼저 회전
+  rotorPositions[2] = (rotorPositions[2] + 1) % 26;
+
+  // 오른쪽 로터가 노치 위치인지 체크해서 중간 로터 회전 여부 결정
+  const rightNotch = ROTORS[rotorOrder[2]].notch.charCodeAt(0) - 65;
+  if(rotorPositions[2] === rightNotch) {
+    rotorPositions[1] = (rotorPositions[1] + 1) % 26;
+
+    // 중간 로터가 노치 위치인지 체크해서 왼쪽 로터 회전 여부 결정
+    const middleNotch = ROTORS[rotorOrder[1]].notch.charCodeAt(0) - 65;
+    if(rotorPositions[1] === middleNotch) {
+      rotorPositions[0] = (rotorPositions[0] + 1) % 26;
+    }
+  }
+
+  updateRotorUI(0);
+  updateRotorUI(1);
+  updateRotorUI(2);
+}
+
+
+  // 로터 신호 통과
+  function passThroughRotors(ch, forward) {
+    let index = ch.charCodeAt(0) - 65;
+    if(forward) {
+      for(let i=2; i>=0; i--) {
+        const rotor = ROTORS[rotorOrder[i]];
+        const pos = rotorPositions[i];
+        const ring = ringSettings[i];
+        const offsetIndex = (index + pos - ring + 26) % 26;
+        const wiredChar = rotor.wiring[offsetIndex];
+        index = (wiredChar.charCodeAt(0) - 65 - pos + ring + 26) % 26;
+      }
+    } else {
+      for(let i=0; i<3; i++) {
+        const rotor = ROTORS[rotorOrder[i]];
+        const pos = rotorPositions[i];
+        const ring = ringSettings[i];
+        const offsetIndex = (index + pos - ring + 26) % 26;
+        const wiredIndex = rotor.wiring.indexOf(alphabet[offsetIndex]);
+        index = (wiredIndex - pos + ring + 26) % 26;
+      }
+    }
+    return alphabet[index];
+  }
+
+  // 암호화 / 복호화 (대칭)
+  function encryptLetter(letter) {
+    letter = letter.toUpperCase();
+    if(!alphabet.includes(letter)) return;
+
+    appendInput(letter);
+    stepRotors();
+
+    let c = plugboardSwap(letter);
+    c = passThroughRotors(c, true);
+    c = REFLECTORS[reflectorDom.value][c.charCodeAt(0) - 65];
+    c = passThroughRotors(c, false);
+    c = plugboardSwap(c);
+
+    flashLamp(c);
+    appendOutput(c);
+  }
+
+  // 초기화
+  function init() {
+    rotorPositions = [0, 0, 0];
+    ringSettings = [0, 0, 0];
+    createPlugboard();
+    createKeyboard();
+    createLamps();
+    rotorsDom.forEach((_,i) => updateRotorUI(i));
+    updatePlugboardUIAndText();
+  }
+  init();
+
+  // 물리 키보드 이벤트
+  window.addEventListener('keydown', e => {
+    if(e.key.length === 1 && alphabet.includes(e.key.toUpperCase())) {
+      e.preventDefault();
+      encryptLetter(e.key);
+    }
+  });
+})();
+
+// 누적 출력 요소
+const inputOutput = document.getElementById('inputOutput');
+const accumulatedOutput = document.getElementById('accumulatedOutput');
+const clearOutputBtn = document.getElementById('clearOutput');
+
+function appendInput(ch) {
+  inputOutput.textContent += ch;
+}
+
+function appendOutput(ch) {
+  accumulatedOutput.textContent += ch;
+}
+
+clearOutputBtn.addEventListener('click', () => {
+  inputOutput.textContent = '';
+  accumulatedOutput.textContent = '';
+});
+</script>
+
+</body>
+</html>
